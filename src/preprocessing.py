@@ -105,3 +105,43 @@ def expand_dict_column(df, dict_col):
     df_expanded = pd.concat([df.drop(columns=[dict_col]), dict_expanded], axis=1)
     
     return df_expanded
+
+
+def expand_video_games_rank(df, rank_col="rank", new_col="games_rank"):
+    """
+    Extracts the 'Video Games' top-level category rank from a messy rank column
+    and adds it as a clean numeric column. Ignores all other categories or text.
+
+    Args:
+        df (pd.DataFrame): DataFrame containing the rank column.
+        rank_col (str): Name of the column with category rank info.
+        new_col (str): Name for the new column to store Video Games rank.
+
+    Returns:
+        pd.DataFrame: DataFrame with only the new Video Games rank column added.
+    """
+
+    def extract_video_game_rank(cell):
+        if isinstance(cell, str):
+            items = [cell]
+        elif isinstance(cell, list):
+            items = cell
+        else:
+            return None
+
+        for item in items:
+            if not isinstance(item, str):
+                continue
+                
+            item = html.unescape(item)
+            match = re.search(r'#([\d,]+) in ([^(]+)', item)
+            if match:
+                rank = int(match.group(1).replace(',', ''))
+                category = match.group(2).split('>')[0].strip()
+                if category.lower() == "video games":
+                    return rank
+        return None
+
+    df[new_col] = df[rank_col].apply(extract_video_game_rank)
+
+    return df
