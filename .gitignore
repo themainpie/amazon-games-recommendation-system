@@ -1,12 +1,15 @@
-# Virtual environments
 venv/
+.env
 
-# Jupyter
 .ipynb_checkpoints/
 
-# Data
 data/
 
-# Python cache
 __pycache__/
 *.pyc
+
+data/*
+
+models/*.pkl
+
+logs/
