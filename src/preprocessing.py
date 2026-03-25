@@ -1,5 +1,7 @@
 import pandas as pd
 import pickle
+import html
+import re
 from datetime import datetime
 from src.load_data import INTERMEDIATE_DATA_DIR
 
@@ -7,19 +9,31 @@ from src.load_data import INTERMEDIATE_DATA_DIR
 def filter_users_items(df, user_min=5, item_min=10):
     """
     Filter users and items based on minimum review counts.
+    Also removes duplicate user-item interactions, keeping the most recent review.
 
     Args:
-        df (pd.DataFrame): DataFrame with at least 'reviewerID' and 'asin' columns.
+        df (pd.DataFrame): DataFrame with at least 'reviewerID', 'asin',
+                           and 'unixReviewTime' columns.
         user_min (int): Minimum number of reviews a user must have to be kept.
         item_min (int): Minimum number of reviews an item must have to be kept.
 
     Returns:
-        pd.DataFrame: Filtered DataFrame containing only users/items meeting the thresholds.
-    """
+        pd.DataFrame: Filtered DataFrame with duplicates removed and only
+                      users/items meeting the thresholds.
+    """  
+    df = df.sort_values('unixReviewTime', ascending=False)
+    df = df.drop_duplicates(subset=['reviewerID', 'asin'], keep='first')
+
+    print(f"After deduplication:  {len(df):,} interactions remaining")
+
     user_counts = df['reviewerID'].value_counts()
     item_counts = df['asin'].value_counts()
-    return df[df['reviewerID'].isin(user_counts[user_counts >= user_min].index) &
-              df['asin'].isin(item_counts[item_counts >= item_min].index)]
+    df = df[df['reviewerID'].isin(user_counts[user_counts >= user_min].index) &
+            df['asin'].isin(item_counts[item_counts >= item_min].index)]
+
+    print(f"After k-core filter:  {len(df):,} interactions remaining")
+
+    return df
 
 
 def time_split(df, t1_quantile=0.7, t2_quantile=0.85):
@@ -107,7 +121,7 @@ def expand_dict_column(df, dict_col):
     return df_expanded
 
 
-def expand_video_games_rank(df, rank_col="rank", new_col="games_rank"):
+def expand_video_games_rank(df, rank_col="rank", new_col="item_rank"):
     """
     Extracts the 'Video Games' top-level category rank from a messy rank column
     and adds it as a clean numeric column. Ignores all other categories or text.
@@ -145,3 +159,23 @@ def expand_video_games_rank(df, rank_col="rank", new_col="games_rank"):
     df[new_col] = df[rank_col].apply(extract_video_game_rank)
 
     return df
+
+
+def merge_item_rank(df_main: pd.DataFrame, df_meta: pd.DataFrame, rank_col: str = "item_rank") -> pd.DataFrame:
+    """
+    Merge only the 'item_rank' column from metadata into main DataFrame on 'asin'.
+
+    Args:
+        df_main (pd.DataFrame): Main DataFrame with 'asin'.
+        df_meta (pd.DataFrame): Metadata DataFrame with 'asin' and item_rank column.
+        rank_col (str): Name of column in df_meta to merge.
+
+    Returns:
+        pd.DataFrame: Main DataFrame with 'item_rank' added. Missing ranks as NaN.
+    """
+    if 'asin' not in df_main.columns:
+        raise ValueError("Main DataFrame must contain 'asin' column")
+    if 'asin' not in df_meta.columns or rank_col not in df_meta.columns:
+        raise ValueError(f"Metadata must contain 'asin' and '{rank_col}' columns")
+    
+    return df_main.merge(df_meta[['asin', rank_col]], on='asin', how='left')
