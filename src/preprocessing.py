@@ -63,6 +63,8 @@ def time_split(df, t1_quantile=0.7, t2_quantile=0.85):
             (df['reviewerID'].isin(train_users)) & (df['asin'].isin(train_items))]
 
     print(f"Split sizes -> Train: {len(train)}, Val: {len(val)}, Test: {len(test)}")
+    print(f"Val coverage:  {len(val)/len(df[df['reviewTime'] > t1])*100:.1f}% of post-t1 interactions kept")
+    print(f"Test coverage: {len(test)/len(df[df['reviewTime'] > t2])*100:.1f}% of post-t2 interactions kept")
     return train, val, test
 
 
